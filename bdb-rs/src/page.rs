@@ -16,7 +16,39 @@ impl<'a> Page<'a> {
         Self { header, data }
     }
 
-    pub fn entries(&'a self) -> impl Iterator<Item = Entry<'a>> {
+    pub fn get_entry(&'a self, index: usize) -> Option<Entry<'a>> {
+        let PageHeader::BTree { entries, level, .. } = self.header else {
+            return None;
+        };
+
+        if index >= entries as usize {
+            return None;
+        }
+
+        let prev_offset = if index == 0 {
+            4096
+        } else {
+            self.get_offset(index - 1)
+        };
+        let offset = self.get_offset(index);
+        let buffer = &self.data[offset..prev_offset];
+        let entry = if level == 1 {
+            Entry::new_keydata(buffer)
+        } else {
+            Entry::new_internal(buffer)
+        };
+        Some(entry)
+    }
+
+    fn get_offset(&self, index: usize) -> usize {
+        u16::from_le_bytes(
+            self.data[(26 + 2 * index)..(28 + 2 * index)]
+                .try_into()
+                .unwrap(),
+        ) as usize
+    }
+
+    pub fn entries(&'a self) -> EntryIterator<'a> {
         EntryIterator::new(self)
     }
 
@@ -31,21 +63,36 @@ impl<'a> Page<'a> {
     pub fn is_internal(&self) -> bool {
         !(self.is_metadata() || self.is_leaf())
     }
+
+    pub fn next_page_number(&self) -> Option<u32> {
+        if let PageHeader::BTree { next_pgno, .. } = self.header {
+            if next_pgno != 0 {
+                return Some(next_pgno);
+            }
+        }
+        None
+    }
+
+    pub fn is_last_page(&self) -> bool {
+        matches!(
+            self.header,
+            PageHeader::BTree {
+                level: 1,
+                next_pgno: 0,
+                ..
+            }
+        )
+    }
 }
 
-struct EntryIterator<'a> {
+pub struct EntryIterator<'a> {
     current: usize,
-    end: usize,
     page: &'a Page<'a>,
 }
 
 impl<'a> EntryIterator<'a> {
     fn new(page: &'a Page<'a>) -> Self {
-        Self {
-            current: 0,
-            end: 4096,
-            page,
-        }
+        Self { current: 0, page }
     }
 }
 
@@ -53,29 +100,9 @@ impl<'a> Iterator for EntryIterator<'a> {
     type Item = Entry<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let PageHeader::BTree { entries, level, .. } = self.page.header else {
-            return None;
-        };
-
-        if entries as usize <= self.current {
-            return None;
-        }
-
-        let offset = u16::from_le_bytes(
-            self.page.data[(26 + 2 * self.current)..(28 + 2 * self.current)]
-                .try_into()
-                .unwrap(),
-        ) as usize;
-
-        let buffer = &self.page.data[offset..self.end];
-        let entry = if level == 1 {
-            Entry::new_keydata(buffer)
-        } else {
-            Entry::new_internal(buffer)
-        };
+        let entry = self.page.get_entry(self.current);
         self.current += 1;
-        self.end = offset;
-        Some(entry)
+        entry
     }
 }
 
