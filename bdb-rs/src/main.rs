@@ -6,15 +6,26 @@ mod page;
 
 use database::DB;
 
-fn main() {
-    let filename = env::args().nth(1).unwrap();
-    let db = DB::open(filename);
-    for page in db.pages() {
-        println!("{:#?}", page.header);
-    }
-    println!("Key-Value Data:");
-    for (key, value) in db.walk() {
-        println!("   Key: {key}");
-        println!("   Value: {value}");
+fn main() -> std::io::Result<()> {
+    let filename = env::args().nth(1).expect("Please pass a database filename");
+    let db = DB::open(filename)?;
+    // db.stat_print();
+    test_get(&db, "bbbbbbbbbbbbbbbbbbbb");
+    test_get(&db, "kjshdfkhjdsfhdsj");
+    test_get(&db, "ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");
+    db.close();
+    Ok(())
+}
+
+fn test_get(db: &DB, key: &str) {
+    let bytes = key.as_bytes();
+    match db.get(bytes) {
+        Some(value) => {
+            let value_str = std::str::from_utf8(value).unwrap();
+            println!("key: {key}, data: {value_str}");
+        }
+        None => {
+            println!("key not found");
+        }
     }
 }

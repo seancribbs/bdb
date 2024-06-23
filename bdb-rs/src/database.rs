@@ -1,4 +1,5 @@
-use crate::page::{EntryIterator, Page, PageHeader};
+use crate::page::{Page, PageHeader};
+use itertools::Itertools;
 use std::fs;
 use std::path::Path;
 
@@ -9,9 +10,66 @@ pub struct DB {
 }
 
 impl DB {
-    pub fn open(filename: impl AsRef<Path>) -> Self {
-        let buffer = fs::read(filename).unwrap();
-        Self { buffer }
+    pub fn open(filename: impl AsRef<Path>) -> std::io::Result<Self> {
+        let buffer = fs::read(filename)?;
+        Ok(Self { buffer })
+    }
+
+    pub fn close(self) {}
+
+    pub fn stat_print(&self) {
+        for page in self.pages() {
+            println!("{:#?}", page.header);
+        }
+        println!("Key-Value Data:");
+        for (key, value) in self.walk() {
+            println!("   Key: {key}");
+            println!("   Value: {value}");
+        }
+    }
+
+    pub fn get(&self, key: &[u8]) -> Option<&[u8]> {
+        let mut current_page = self.pages().find_map(|p| {
+            if let PageHeader::Metadata { root, .. } = p.header {
+                Some(root as usize)
+            } else {
+                None
+            }
+        })?;
+        loop {
+            let page = self.page(current_page)?;
+            if page.is_internal() {
+                let mut prev: Option<usize> = None;
+                for entry in page.entries() {
+                    if let Entry::Internal { pgno, data, .. } = entry {
+                        if key >= data {
+                            prev = Some(pgno as usize);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        unreachable!();
+                    }
+                }
+                current_page = prev?;
+            } else {
+                let offset = page.entries().step_by(2).position(|entry| {
+                    if let Entry::KeyData { data: key_data, .. } = entry {
+                        key == key_data
+                    } else {
+                        false
+                    }
+                })?;
+                if let Entry::KeyData {
+                    data: value_data, ..
+                } = page.get_entry(offset * 2 + 1)?
+                {
+                    return Some(value_data);
+                };
+                break;
+            }
+        }
+        None
     }
 
     pub fn pages(&self) -> impl Iterator<Item = Page<'_>> {
@@ -20,6 +78,16 @@ impl DB {
 
     pub fn raw_pages(&self) -> impl Iterator<Item = &[u8]> {
         self.buffer.chunks(4096)
+    }
+
+    fn page(&self, index: usize) -> Option<Page<'_>> {
+        let start_offset = index * 4096;
+        let end_offset = start_offset + 4096;
+        if end_offset <= self.buffer.len() {
+            Some(Page::new(&self.buffer[start_offset..end_offset]))
+        } else {
+            None
+        }
     }
 
     pub fn walk(&self) -> impl Iterator<Item = (Entry<'_>, Entry<'_>)> {
