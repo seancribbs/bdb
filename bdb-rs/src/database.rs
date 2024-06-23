@@ -22,7 +22,7 @@ impl DB {
         self.buffer.chunks(4096)
     }
 
-    pub fn walk(&'a self) -> impl Iterator<Item = (Entry<'a>, Entry<'a>)> {
+    pub fn walk(&self) -> impl Iterator<Item = (Entry<'_>, Entry<'_>)> {
         Walk::new(self)
     }
 }
@@ -68,16 +68,17 @@ impl<'a> Walk<'a> {
             match page.header {
                 // is_leaf()
                 PageHeader::BTree { level: 1, .. } => {
-                    self.entry = 0;
                     break;
                 }
                 PageHeader::BTree { .. } => {
                     let Entry::Internal { pgno, .. } = page.entries().next().unwrap() else {
                         unreachable!()
                     };
+                    self.entry = 0;
                     self.page = pgno as usize;
                 }
                 PageHeader::Metadata { root, .. } => {
+                    self.entry = 0;
                     self.page = root as usize;
                 }
             }
@@ -90,27 +91,28 @@ impl<'a> Iterator for Walk<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.move_to_leaf();
-        let page = &self.pages[self.page];
-        match (page.get_entry(self.entry), page.get_entry(self.entry + 1)) {
-            (Some(k), Some(v)) => {
-                self.entry += 2;
-                return Some((k, v));
-            }
-            (None, None) => {
-                if let Some(next) = page.next_page_number() {
-                    self.page = next as usize;
-                    self.entry = 0;
-                    return self.next();
+        let mut page = self.page;
+        let mut entry = self.entry;
+        let mut result;
+        loop {
+            let current_page = &self.pages[page];
+            result = current_page
+                .get_entry(entry)
+                .zip(current_page.get_entry(entry + 1));
+            // NOTE: we ignore when there are uneven numbers of entries,
+            // assuming we should try the next page
+            if result.is_none() {
+                if let Some(next) = current_page.next_page_number() {
+                    page = next as usize;
+                    entry = 0;
+                    continue;
                 }
             }
-            _ => panic!("number of entries is odd"),
+            entry += 2;
+            break;
         }
-        // (k, v)
-        // 1. try to read k => Some(..)
-        //    try to read v => Some(..) => return Some(k, v)
-        // 2. try to read k => None
-        //    are we at the last page? => return None
-        //    otherwise: move to the next page and try to read again
-        None
+        self.page = page;
+        self.entry = entry;
+        result
     }
 }

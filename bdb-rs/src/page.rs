@@ -1,6 +1,7 @@
 use crate::entry::Entry;
 use std::fmt::Debug;
 
+#[derive(Clone)]
 pub struct Page<'a> {
     pub header: PageHeader<'a>,
     data: &'a [u8],
@@ -16,7 +17,7 @@ impl<'a> Page<'a> {
         Self { header, data }
     }
 
-    pub fn get_entry(&'a self, index: usize) -> Option<Entry<'a>> {
+    pub fn get_entry(&self, index: usize) -> Option<Entry<'a>> {
         let PageHeader::BTree { entries, level, .. } = self.header else {
             return None;
         };
@@ -114,7 +115,7 @@ impl<'a> Debug for Page<'a> {
     }
 }
 
-#[derive(Debug, derive_more::IsVariant)]
+#[derive(Debug, Clone, derive_more::IsVariant)]
 pub enum PageHeader<'a> {
     Metadata {
         lsn: u64,

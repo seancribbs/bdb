@@ -1,3 +1,6 @@
+use std::fmt::Display;
+use std::str::from_utf8;
+
 #[derive(Debug)]
 pub enum Entry<'a> {
     KeyData {
@@ -15,6 +18,18 @@ pub enum Entry<'a> {
     //     pgno: u32,
     //     tlen: u32,
     // },
+}
+
+impl<'a> Display for Entry<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Self::KeyData { data, .. } = self {
+            if let Ok(s) = from_utf8(data) {
+                return write!(f, "{s}");
+            }
+        }
+        // TODO: implement Display for Internal and Overflow variants
+        write!(f, "...")
+    }
 }
 
 impl<'a> Entry<'a> {
