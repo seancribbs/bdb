@@ -1,0 +1,25 @@
+defmodule Bdb.Header.Metadata do
+  defstruct([
+    :lsn,
+    :pgno,
+    :version,
+    :pagesize,
+    :ec,
+    :ty,
+    :mf,
+    :free,
+    :last_pgno,
+    :nparts,
+    :key_count,
+    :record_count,
+    :flags,
+    :uid,
+    :minkey,
+    :re_len,
+    :re_pad,
+    :root,
+    :crypto_magic,
+    :iv,
+    :chksum
+  ])
+end

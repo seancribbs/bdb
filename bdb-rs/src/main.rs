@@ -9,8 +9,8 @@ use database::DB;
 fn main() -> std::io::Result<()> {
     let filename = env::args().nth(1).expect("Please pass a database filename");
     let db = DB::open(filename)?;
-    // db.stat_print();
-    // println!("==================================");
+    db.stat_print();
+    println!("==================================");
     test_get(&db, "bbbbbbbbbbbbbbbbb");
     test_get(&db, "kjshdfkhjdsfhdsj");
     test_get(&db, "sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");
