@@ -1,5 +1,6 @@
-use crate::page::{Page, PageHeader};
 use itertools::Itertools;
+
+use crate::page::{Page, PageHeader};
 use std::fs;
 use std::path::Path;
 
@@ -53,16 +54,21 @@ impl DB {
                 }
                 current_page = prev?;
             } else {
-                let offset = page.entries().step_by(2).position(|entry| {
-                    if let Entry::KeyData { data: key_data, .. } = entry {
-                        key == key_data
-                    } else {
-                        false
+                let mut offset = None;
+                for (idx, entry) in page.entries().enumerate().step_by(2) {
+                    let Entry::KeyData { data: key_data } = entry else {
+                        unreachable!();
+                    };
+                    if key == key_data {
+                        offset = Some(idx);
                     }
-                })?;
+                    if key <= key_data {
+                        break;
+                    }
+                }
                 if let Entry::KeyData {
                     data: value_data, ..
-                } = page.get_entry(offset * 2 + 1)?
+                } = page.get_entry(offset? + 1)?
                 {
                     return Some(value_data);
                 };
@@ -110,21 +116,21 @@ impl<'a> Walk<'a> {
         }
     }
 
-    fn move_to_next_page(&mut self) {
-        let page = &self.pages[self.page];
-        let PageHeader::BTree {
-            level: 1,
-            next_pgno,
-            ..
-        } = page.header
-        else {
-            unreachable!()
-        };
-        if next_pgno != 0 {
-            self.page = next_pgno as usize;
-            self.entry = 0;
-        }
-    }
+    // fn move_to_next_page(&mut self) {
+    //     let page = &self.pages[self.page];
+    //     let PageHeader::BTree {
+    //         level: 1,
+    //         next_pgno,
+    //         ..
+    //     } = page.header
+    //     else {
+    //         unreachable!()
+    //     };
+    //     if next_pgno != 0 {
+    //         self.page = next_pgno as usize;
+    //         self.entry = 0;
+    //     }
+    // }
 
     fn current_page(&self) -> &Page<'a> {
         &self.pages[self.page]

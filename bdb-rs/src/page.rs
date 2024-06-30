@@ -74,16 +74,16 @@ impl<'a> Page<'a> {
         None
     }
 
-    pub fn is_last_page(&self) -> bool {
-        matches!(
-            self.header,
-            PageHeader::BTree {
-                level: 1,
-                next_pgno: 0,
-                ..
-            }
-        )
-    }
+    // pub fn is_last_page(&self) -> bool {
+    //     matches!(
+    //         self.header,
+    //         PageHeader::BTree {
+    //             level: 1,
+    //             next_pgno: 0,
+    //             ..
+    //         }
+    //     )
+    // }
 }
 
 pub struct EntryIterator<'a> {
@@ -115,6 +115,7 @@ impl<'a> Debug for Page<'a> {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, derive_more::IsVariant)]
 pub enum PageHeader<'a> {
     Metadata {
